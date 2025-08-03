@@ -1,21 +1,47 @@
 
+import { db } from '../db';
+import { donationsTable } from '../db/schema';
 import { type UpdateDonationInput, type Donation } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function updateDonation(input: UpdateDonationInput): Promise<Donation> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is updating donation status and payment proof URL.
-    // This will be used by admins to confirm payments after bank transfer verification.
-    return Promise.resolve({
-        id: input.id,
-        campaign_id: 1,
-        donor_name: 'John Doe',
-        donor_email: null,
-        donor_phone: null,
-        amount: 100000,
-        message: null,
-        payment_status: input.payment_status || 'pending',
-        payment_proof_url: input.payment_proof_url || null,
-        created_at: new Date(),
-        confirmed_at: input.payment_status === 'confirmed' ? new Date() : null
-    } as Donation);
-}
+export const updateDonation = async (input: UpdateDonationInput): Promise<Donation> => {
+  try {
+    // Build update values object
+    const updateValues: any = {};
+    
+    if (input.payment_status !== undefined) {
+      updateValues.payment_status = input.payment_status;
+      // Set confirmed_at when status changes to 'confirmed'
+      if (input.payment_status === 'confirmed') {
+        updateValues.confirmed_at = new Date();
+      } else if (input.payment_status === 'pending' || input.payment_status === 'failed') {
+        updateValues.confirmed_at = null;
+      }
+    }
+    
+    if (input.payment_proof_url !== undefined) {
+      updateValues.payment_proof_url = input.payment_proof_url;
+    }
+
+    // Update donation record
+    const result = await db.update(donationsTable)
+      .set(updateValues)
+      .where(eq(donationsTable.id, input.id))
+      .returning()
+      .execute();
+
+    if (result.length === 0) {
+      throw new Error(`Donation with id ${input.id} not found`);
+    }
+
+    // Convert numeric fields back to numbers before returning
+    const donation = result[0];
+    return {
+      ...donation,
+      amount: parseFloat(donation.amount) // Convert string back to number
+    };
+  } catch (error) {
+    console.error('Donation update failed:', error);
+    throw error;
+  }
+};

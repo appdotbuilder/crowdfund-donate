@@ -1,14 +1,25 @@
 
 import { z } from 'zod';
+import { db } from '../db';
+import { campaignsTable } from '../db/schema';
+import { eq } from 'drizzle-orm';
 
-const deleteCampaignInputSchema = z.object({
-    id: z.number()
+export const deleteCampaignInputSchema = z.object({
+  id: z.number()
 });
 
 export type DeleteCampaignInput = z.infer<typeof deleteCampaignInputSchema>;
 
-export async function deleteCampaign(input: DeleteCampaignInput): Promise<{ success: boolean }> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is deleting a campaign from the database.
-    return Promise.resolve({ success: true });
-}
+export const deleteCampaign = async (input: DeleteCampaignInput): Promise<{ success: boolean }> => {
+  try {
+    const result = await db.delete(campaignsTable)
+      .where(eq(campaignsTable.id, input.id))
+      .returning()
+      .execute();
+
+    return { success: result.length > 0 };
+  } catch (error) {
+    console.error('Campaign deletion failed:', error);
+    throw error;
+  }
+};
